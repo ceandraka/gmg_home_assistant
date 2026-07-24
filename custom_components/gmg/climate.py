@@ -43,17 +43,17 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         _LOGGER.debug(f"Grill found in configuration file. {hostIP},{hostName}")
         all_grills = createGrillObject(hostIP, hostName)
 
-    for my_grill in all_grills:
+    for my_grill in all_grills: 
         _LOGGER.debug(f"Found grill IP: {my_grill._ip} Serial: {my_grill._serial_number}")
 
-    entities.append(GmgGrill(my_grill))
+        entities.append(GmgGrill(my_grill))
 
-    count = 1
-    probe_count = 2
+        count = 1
+        probe_count = 2
 
-    while count <= probe_count:
-        entities.append(GmgGrillProbe(my_grill, count))
-        count += 1
+        while count <= probe_count:
+            entities.append(GmgGrillProbe(my_grill, count))
+            count += 1
 
     async_add_entities(entities)
 
@@ -66,10 +66,9 @@ class GmgGrill(ClimateEntity):
         """Initialize the Grill."""
         self._grill = grill
         self._unique_id = "{}".format(self._grill._serial_number)
-        self._state = None
-
+        
         _LOGGER.debug(f"Found grill IP: {self._grill._ip} Serial: {self._grill._serial_number}")
-
+        
         self.update()
 
 
@@ -82,7 +81,7 @@ class GmgGrill(ClimateEntity):
             return
         if temperature == _currentTargetTemp:
             return
-
+        
         # Add in section if grill is not on to error... 
         if self.hvac_mode == HVACMode.OFF:
             _LOGGER.warning("Grill is not on, cannot set temperature")
@@ -90,10 +89,6 @@ class GmgGrill(ClimateEntity):
             return
 
         grillTemp = self.current_temperature
-        
-        if grillTemp is None:
-            _LOGGER.warning("Grill temperature is currently unknown, cannot safely set temperature.")
-            return
 
         if grillTemp < 140:
             # GMG manual says need to wait until 150 F at least before changing temp 
@@ -122,25 +117,19 @@ class GmgGrill(ClimateEntity):
     def turn_off(self):
         """Turn device off."""
         return self._grill.power_off()
-
+    
     @property
     def supported_features(self):
         """Return the list of supported features."""
         return (ClimateEntityFeature.TARGET_TEMPERATURE)
-
+    
     @property
     def icon(self):
         return "mdi:grill"
 
     @property
-    def hvac_modes(self) -> List[str]:
-        """Return the supported operations."""
-        return [ HVACMode.HEAT, HVACMode.FAN_ONLY, HVACMode.OFF]
-
-    @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        # If the state dict is None, empty, or missing the 'on' key, the grill is offline
         if not self._state or 'on' not in self._state:
             return False
         return True
@@ -150,17 +139,15 @@ class GmgGrill(ClimateEntity):
         """Return current HVAC operation."""
         if not self.available:
             return None
-
-        grill_on_state = self._state.get('on', 0)
-
-        if grill_on_state == 1:
+        if self._state['on'] == 1:
             return HVACMode.HEAT
-        elif grill_on_state == 2:
+        elif self._state['on'] == 2:
             return HVACMode.FAN_ONLY
+
         return HVACMode.OFF
 
     @property
-    def name(self) -> None:
+    def name(self)  -> None:
         """Return unique ID of grill which is GMGSERIAL_NUMBER"""
         return self._unique_id
 
@@ -175,12 +162,8 @@ class GmgGrill(ClimateEntity):
         """Return current temp of the grill"""
         if not self.available:
             return None
-            
         grillTemp = self._state.get('temp')
         tempMultiplier = self._state.get('temp_high')
-
-        if grillTemp is None:
-            return None
 
         if tempMultiplier == 1:
             grillTemp = 256 + grillTemp
@@ -191,18 +174,14 @@ class GmgGrill(ClimateEntity):
     def target_temperature_step(self) -> None:
         """Return the supported step of target temp"""
         return 1
-
+        
     @property
     def target_temperature(self) -> None:
         """Return what the temp is set to go to"""
         if not self.available:
             return None
-
         grillSetTemp = self._state.get('grill_set_temp')
         tempMultiplier = self._state.get('grill_set_temp_high')
-
-        if grillSetTemp is None:
-            return None
 
         if tempMultiplier == 1:
             grillSetTemp = 256 + grillSetTemp
@@ -228,19 +207,15 @@ class GmgGrill(ClimateEntity):
         """Get latest data."""
         try:
             self._state = self._grill.status()
-            
             if self._state is not None:
                 _LOGGER.debug(f"State: {self._state}")
             else:
                 _LOGGER.debug("Grill state empty. Scheduling rapid retry.")
-                # Tells HA that this data poll failed, prompting a native immediate retry queue
                 raise Exception("Empty state packet received")
-                
         except Exception as ex:
             _LOGGER.debug(f"Failed to fetch grill status: {ex}")
             self._state = None
-            
-			
+
 class GmgGrillProbe(ClimateEntity):
     """Representation of a Green Mountain Grill smoker food probes"""
 
@@ -249,7 +224,6 @@ class GmgGrillProbe(ClimateEntity):
         self._grill = grill
         self._unique_id = f"{self._grill._serial_number}_probe_{probe_count}"
         self._probe_count = probe_count
-        self._state = None
 
         _LOGGER.debug(f"From grill: {self._grill._serial_number} init probe: {probe_count}")
 
@@ -262,17 +236,11 @@ class GmgGrillProbe(ClimateEntity):
 
         if temperature is None:
             return
-            
-        if not self.available:
-            _LOGGER.error("Grill is offline, cannot set probe temperature")
+        if temperature == self._state['probe1_set_temp']:
             return
-
-        probe_set_key = f'probe{self._probe_count}_set_temp'
-        if temperature == self._state.get(probe_set_key):
-            return
-
+        
         # Add in section if grill is not on to error... 
-        if self._state.get('on', 0) == 0:
+        if self._state['on'] == 0:
             _LOGGER.error("Grill is not on, cannot set temperature")
             return
 
@@ -294,18 +262,14 @@ class GmgGrillProbe(ClimateEntity):
         if not self._state or 'on' not in self._state:
             return False
         return True
-
+	
     @property
     def hvac_mode(self):
         """Return current HVAC operation."""
         if not self.available:
             return None
-
-        probe_temp_key = f'probe{self._probe_count}_temp'
-        probe_temp = self._state.get(probe_temp_key)
-
         # Probe temp is 89 when it is not plugged in... need to find out if better way to find if connected or not..
-        if self._state.get('on', 0) == 1 and probe_temp is not None and probe_temp != 89:
+        if self._state['on'] == 1 and self._state[f'probe{self._probe_count}_temp'] != 89:
             return HVACMode.HEAT
 
         return HVACMode.OFF
@@ -314,13 +278,13 @@ class GmgGrillProbe(ClimateEntity):
     def supported_features(self):
         """Return the list of supported features."""
         return (ClimateEntityFeature.TARGET_TEMPERATURE)
-
+    
     @property
     def icon(self):
         return "mdi:thermometer-lines"
 
     @property
-    def name(self) -> None:
+    def name(self)  -> None:
         """Return unique ID of grill which is GMGSERIAL_NUMBER_probe_count"""
         return self._unique_id
 
@@ -334,24 +298,24 @@ class GmgGrillProbe(ClimateEntity):
         """Return current temp of the grill"""
         if not self.available:
             return None
-        return self._state.get(f'probe{self._probe_count}_temp')
+		return self._state.get(f'probe{self._probe_count}_temp')
 
     @property
     def target_temperature_step(self) -> None:
-        """Return the supported step of target temp"""
+        """Return the supported step of target temp"""        
         return 1
-
+        
     @property
     def target_temperature(self) -> None:
         """Return what the temp is set to go to"""
-        if not self.available:
-            return None
         return self._state.get(f'probe{self._probe_count}_set_temp')
 
     @property
     def max_temp(self) -> None:
         """Return the maximum temperature."""
-        return self._grill.MAX_TEMP_F_PROBE
+        if not self.available:
+            return None
+		return self._grill.MAX_TEMP_F_PROBE
 
     @property
     def min_temp(self) -> None:
@@ -365,10 +329,7 @@ class GmgGrillProbe(ClimateEntity):
 
     def update(self) -> None:
         """Get latest data."""
-        try:
-            self._state = self._grill.status()
-            _LOGGER.debug(f"State: {self._state}")
-        except Exception as ex:
-            _LOGGER.debug(f"Failed to fetch probe status: {ex}")
-            self._state = None
+        self._state = self._grill.status()
+
+        _LOGGER.debug(f"State: {self._state}")
 
