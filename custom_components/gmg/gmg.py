@@ -136,44 +136,50 @@ class grill(object):
         self.state = self.getInitialState()
 
     def gmg_status_response (self, value_list):
-        # accept list of values from status 
-        if value_list is not None:
-            self.state = {}
+        # accept list of values from status
+        if value_list is None:
+            return None
+            
+        _LOGGER.debug(f"Status response raw: {value_list}")
+        
+        # Verify the list length before parsing to avoid IndexError
+        if len(value_list) < 34:
+            _LOGGER.debug(f"Received truncated status packet (length {len(value_list)}). Expected at least 34 items.")
+            return None
 
-            _LOGGER.debug(f"Status response raw: {value_list}")
-
-            # grill general status
-            try:
-                self.state['on'] = value_list[30]
-                self.state['temp'] = value_list[2]
-                self.state['temp_high'] = value_list[3]
-                self.state['grill_set_temp'] = value_list[6]
-                self.state['grill_set_temp_high'] = value_list[7]
-
-                # probe 1 stats
-                self.state['probe1_temp'] = value_list[4]
-                self.state['probe1_temp_high'] = value_list[5]
-                self.state['probe1_set_temp'] = value_list[28]
-                self.state['probe1_set_temp_high'] = value_list[29]
-                
-                # probe 2 stats
-                self.state['probe2_temp'] = value_list[16]
-                self.state['probe2_temp_high'] = value_list[17]
-                self.state['probe2_set_temp'] = value_list[18]
-                self.state['probe2_set_temp_high'] = value_list[19]
-
-                # Grill health stats
-                self.state['fireState'] = value_list[32]
-                self.state['fireStatePercentage'] = value_list[33]
-                self.state['warnState'] = value_list[24]
-
-            except Exception as e:
-                _LOGGER.error(e)
-                
-            _LOGGER.debug(f"Status response: {self.state}") 
-     
-
-        return self.state
+        # grill general status
+        try:
+            temp_state = {}
+            temp_state['on'] = value_list[30]
+            temp_state['temp'] = value_list[2]
+            temp_state['temp_high'] = value_list[3]
+            temp_state['grill_set_temp'] = value_list[6]
+            temp_state['grill_set_temp_high'] = value_list[7]
+            
+            # probe 1 stats
+            temp_state['probe1_temp'] = value_list[4]
+            temp_state['probe1_temp_high'] = value_list[5]
+            temp_state['probe1_set_temp'] = value_list[28]
+            temp_state['probe1_set_temp_high'] = value_list[29]
+            
+            # probe 2 stats
+            temp_state['probe2_temp'] = value_list[16]
+            temp_state['probe2_temp_high'] = value_list[17]
+            temp_state['probe2_set_temp'] = value_list[18]
+            temp_state['probe2_set_temp_high'] = value_list[19]
+            
+            # Grill health stats
+            temp_state['fireState'] = value_list[32]
+            temp_state['fireStatePercentage'] = value_list[33]
+            temp_state['warnState'] = value_list[24]
+            
+            self.state = temp_state
+            _LOGGER.debug(f"Status response parsed successfully: {self.state}")
+            return self.state
+            
+        except Exception as e:
+            _LOGGER.error(f"Error parsing status packet: {e}")
+            return None
 
     def set_temp(self, target_temp):
         """Set the target temperature for the grill"""
@@ -265,5 +271,7 @@ class grill(object):
         finally:
             # Always close the socket
             sock.close()
+           
+        return data
            
         return data
