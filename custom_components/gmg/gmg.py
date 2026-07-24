@@ -1,5 +1,9 @@
 """Green Mountain Grill API library"""
 
+
+#from audioop import add
+#from distutils.log import error
+#from email import message
 import socket
 import binascii
 import ipaddress
@@ -11,15 +15,19 @@ _LOGGER = logging.getLogger(__name__)
 def createGrillObject(ipAddress, grillName):
     grills = []
     grills.append(grill(ipAddress, grillName))
+
     return grills
 
 def autoDiscoverGrills(timeout, ip_bind_address):
     _LOGGER.debug("Opening up udp sockets and broadcasting for grills.")
+   
     interfaces = socket.getaddrinfo(host=socket.gethostname(), port=None, family=socket.AF_INET)
     allips = [ip[-1][0] for ip in interfaces]
     allips.append(ip_bind_address)
-    grills = []
+
+    grills = [] 
     message = grill.CODE_SERIAL
+
     
     for ip in allips:
         _LOGGER.debug(f"Creating socket for IP: {ip}")
@@ -28,30 +36,35 @@ def autoDiscoverGrills(timeout, ip_bind_address):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             #Bind to the specific IP for the adapter and use port 0 to signify any open port by the OS
             sock.bind((ip, 0))
+            
             # Each recv should have the full timeout period to complete
             sock.settimeout(timeout)
+
             sock.sendto(message, ('<broadcast>', grill.UDP_PORT))
+
             _LOGGER.debug("Broadcast sent.")
-            
+
             while True:
                 addGrill = True
                 # Get some packets from the network
                 data, (address, retSocket) = sock.recvfrom(1024)
                 response = data.decode('utf-8')
+
                 _LOGGER.debug(f"Received a response {address}:{retSocket}, {response}")
-                
                 # Confirm it's a GMG serial number
                 try:
                     if response.startswith('GMG'):
                         _LOGGER.debug(f"Found grill {address}:{retSocket}, {response}")
                         for grillTest in grills:
-                            if grillTest._serial_number == response:
-                                _LOGGER.debug(f"Grill {response} is a duplicate. Not adding to collection.")
+                            if grillTest._serial_number == response:  # TODO: Define a property for serial number
+                                _LOGGER.debug(f"Grill {response} is a duplicate.  Not adding to collection.")
                                 addGrill = False
+
                         if addGrill:
                             grills.append(grill(address, response))
                 except ValueError:
                     pass
+
         except socket.timeout:
             # This will always happen, a timeout occurs when we no longer hear from any grills
             # This is the required flow to break out of the `while True:` statement above.
@@ -59,55 +72,70 @@ def autoDiscoverGrills(timeout, ip_bind_address):
         finally:
             # Always close the socket
             sock.close()
-            
+    
     return grills
 
 def grills(timeout = 1, ip_bind_address = '0.0.0.0'):
     grills = autoDiscoverGrills(timeout, ip_bind_address)
+
     _LOGGER.debug(f"Found {len(grills)} grills.")
     return grills
+
+
 
 class grill(object):
     UDP_PORT = 8080
     MIN_TEMP_F = 150 # Minimum temperature in degrees Fahrenheit
     MAX_TEMP_F = 500 # Maximum Temperature in degrees Fahrenheit
     MIN_TEMP_F_PROBE = 32 # Mimimum temperature in degrees Fahrenheit
-    MAX_TEMP_F_PROBE = 257 # Maximum temperature in degrees Fahrenheit
+    MAX_TEMP_F_PROBE = 257 # Maximum temperature in degrees Fahrenheit 
+    
     CODE_SERIAL = b'UL!'
     CODE_STATUS = b'UR001!'
+    
+
 
     def getInitialState(self):
         state = {}
+
         state['on'] = 0
         state['temp'] = 0
         state['temp_high'] = 0
         state['grill_set_temp'] = 0
         state['grill_set_temp_high'] = 0
-        # probe 1 stats
+
+           # probe 1 stats
         state['probe1_temp'] = 0
         state['probe1_temp_high'] = 0
         state['probe1_set_temp'] = 0
         state['probe1_set_temp_high'] = 0
-        # probe 2 stats
+        
+                   # probe 2 stats
         state['probe2_temp'] = 0
         state['probe2_temp_high'] = 0
         state['probe2_set_temp'] = 0
         state['probe2_set_temp_high'] = 0
-        # Grill health stats
+
+           # Grill health stats
         state['fireState'] = 0
         state['fireStatePercentage'] = 0
         state['warnState'] = 0
+
         return state
 
+
     def __init__(self, ip, serial_number = ''):
+        
         if not ipaddress.ip_address(ip):
             raise ValueError(f"IP address not valid {ip}")
+
         _LOGGER.debug(f"Initializing grill {ip} with serial number {serial_number}")
-        self._ip = ip
+
+        self._ip = ip 
         self._serial_number = serial_number
         self.state = self.getInitialState()
 
-        def gmg_status_response (self, value_list):
+    def gmg_status_response (self, value_list):
         # accept list of values from status
         if value_list is None:
             return None
@@ -155,33 +183,43 @@ class grill(object):
 
     def set_temp(self, target_temp):
         """Set the target temperature for the grill"""
+
         if target_temp < grill.MIN_TEMP_F or target_temp > grill.MAX_TEMP_F:
             raise ValueError(f"Target temperature {target_temp} is out of range")
+
         message = b'UT' + str(target_temp).encode() + b'!'
+
         return self.send(message)
 
     def set_temp_probe(self, target_temp, probe_number):
         """Set the target temperature for the grill probe"""
+
         if target_temp < grill.MIN_TEMP_F_PROBE or target_temp > grill.MAX_TEMP_F_PROBE:
             raise ValueError(f"Target temperature {target_temp} is out of range")
+
         if probe_number == 1:
             message = b'UF' + str(target_temp).encode() + b'!'
         elif probe_number == 2:
-            message = b'Uf' + str(target_temp).encode() + b'!'
+            message = b'Uf' + str(target_temp).encode() + b'!'        
+
         return self.send(message)
 
     def power_on_cool(self):
         """Power on the grill to cold smoke mode"""
+
         message = b'UK002!'
         return self.send(message)
 
+
     def power_on(self):
         """Power on the grill"""
+
         message = b'UK001!'
         return self.send(message)
 
     def power_off(self):
         """Power off the grill"""
+
         message = b'UK004!'
         return self.send(message)
 
@@ -189,40 +227,49 @@ class grill(object):
         """Get status of grill"""
         status = None
         count = 0
-        
+
+        # No response from grill so resend status request but no more than 3 times
+        # cannot add delay here because it will delay the whole program (Home assistant)
         while status is None and count < 1:
             status = self.send(grill.CODE_STATUS)
+
+            # add delay of 2 seconds to allow grill to process status   
             count += 1
-            
+
         if status is None:
             _LOGGER.debug(f"No response from grill {self._serial_number}")
-            return None
         else:
             status = list(status)
             _LOGGER.debug(f"Setting grill status: {status}")
-            return self.gmg_status_response(status)
+
+        return self.gmg_status_response(status)
+
 
     def serial(self):
         """Get serial number of grill"""
         if self._serial_number is None:
-            raw_serial = self.send(grill.CODE_SERIAL)
-            if raw_serial:
-                self._serial_number = raw_serial.decode('utf-8')
+            self._serial_number = self.send(grill.CODE_SERIAL).decode('utf-8')
+
         return self._serial_number
 
-    def send(self, message, timeout = 1):
+    def send(self, message, timeout = 1):  
         """Function to send messages via UDP to grill"""
+
         data = None
+
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(timeout)
+
             sock.sendto(message, (self._ip, grill.UDP_PORT))
             data, _ = sock.recvfrom(1024)
+        
         except socket.timeout:
             _LOGGER.debug(f"Socket timed out sending message: {message}")
-        except Exception as e:
+        except Exception as e: 
             _LOGGER.error(e)
         finally:
             # Always close the socket
             sock.close()
+           
         return data
