@@ -135,6 +135,11 @@ class GmgGrill(ClimateEntity):
         return True
 
     @property
+    def hvac_modes(self) -> List[str]:
+        """Return the supported operations."""
+        return [ HVACMode.HEAT, HVACMode.FAN_ONLY, HVACMode.OFF]
+
+    @property
     def hvac_mode(self):
         """Return current HVAC operation."""
         if not self.available:
@@ -262,7 +267,7 @@ class GmgGrillProbe(ClimateEntity):
         if not self._state or 'on' not in self._state:
             return False
         return True
-	
+
     @property
     def hvac_mode(self):
         """Return current HVAC operation."""
@@ -298,16 +303,18 @@ class GmgGrillProbe(ClimateEntity):
         """Return current temp of the grill"""
         if not self.available:
             return None
-		return self._state.get(f'probe{self._probe_count}_temp')
+        return self._state.get(f'probe{self._probe_count}_temp')
 
     @property
     def target_temperature_step(self) -> None:
-        """Return the supported step of target temp"""        
+        """Return the supported step of target temp"""
         return 1
-        
+
     @property
     def target_temperature(self) -> None:
         """Return what the temp is set to go to"""
+        if not self.available:
+            return None
         return self._state.get(f'probe{self._probe_count}_set_temp')
 
     @property
@@ -315,7 +322,7 @@ class GmgGrillProbe(ClimateEntity):
         """Return the maximum temperature."""
         if not self.available:
             return None
-		return self._grill.MAX_TEMP_F_PROBE
+        return self._grill.MAX_TEMP_F_PROBE
 
     @property
     def min_temp(self) -> None:
@@ -332,4 +339,3 @@ class GmgGrillProbe(ClimateEntity):
         self._state = self._grill.status()
 
         _LOGGER.debug(f"State: {self._state}")
-
