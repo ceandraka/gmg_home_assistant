@@ -107,7 +107,7 @@ class grill(object):
         self._serial_number = serial_number
         self.state = self.getInitialState()
 
-    def gmg_status_response (self, value_list):
+        def gmg_status_response (self, value_list):
         # accept list of values from status
         if value_list is None:
             return None
