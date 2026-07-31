@@ -178,7 +178,7 @@ class grill(object):
             return self.state
             
         except Exception as e:
-            _LOGGER.error(f"Error parsing status packet: {e}")
+            _LOGGER.debug("Error parsing status packet", exc_info=True)
             return None
 
     def set_temp(self, target_temp):
@@ -252,24 +252,14 @@ class grill(object):
 
         return self._serial_number
 
-    def send(self, message, timeout = 1):  
+    def send(self, message, timeout = 1):
         """Function to send messages via UDP to grill"""
-
         data = None
-
+        sock = None
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(timeout)
-
-            sock.sendto(message, (self._ip, grill.UDP_PORT))
-            data, _ = sock.recvfrom(1024)
-        
-        except socket.timeout:
-            _LOGGER.debug(f"Socket timed out sending message: {message}")
-        except Exception as e: 
-            _LOGGER.error(e)
+            ...
         finally:
-            # Always close the socket
-            sock.close()
-           
+            if sock is not None:
+                sock.close()
         return data
