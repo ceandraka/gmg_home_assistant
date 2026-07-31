@@ -143,7 +143,7 @@ class GmgGrill(ClimateEntity):
     def hvac_mode(self):
         """Return current HVAC operation."""
         if not self.available:
-            return None
+            return HVACMode.OFF
         if self._state['on'] == 1:
             return HVACMode.HEAT
         elif self._state['on'] == 2:
@@ -215,8 +215,7 @@ class GmgGrill(ClimateEntity):
             if self._state is not None:
                 _LOGGER.debug(f"State: {self._state}")
             else:
-                _LOGGER.debug("Grill state empty. Scheduling rapid retry.")
-                raise Exception("Empty state packet received")
+                _LOGGER.debug("Grill state empty.")
         except Exception as ex:
             _LOGGER.debug(f"Failed to fetch grill status: {ex}")
             self._state = None
@@ -272,7 +271,7 @@ class GmgGrillProbe(ClimateEntity):
     def hvac_mode(self):
         """Return current HVAC operation."""
         if not self.available:
-            return None
+            return HVACMode.OFF
         # Probe temp is 89 when it is not plugged in... need to find out if better way to find if connected or not..
         if self._state['on'] == 1 and self._state[f'probe{self._probe_count}_temp'] != 89:
             return HVACMode.HEAT
@@ -320,8 +319,6 @@ class GmgGrillProbe(ClimateEntity):
     @property
     def max_temp(self) -> None:
         """Return the maximum temperature."""
-        if not self.available:
-            return None
         return self._grill.MAX_TEMP_F_PROBE
 
     @property
