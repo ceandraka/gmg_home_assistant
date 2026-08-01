@@ -66,9 +66,8 @@ class GmgGrill(ClimateEntity):
         """Initialize the Grill."""
         self._grill = grill
         self._unique_id = "{}".format(self._grill._serial_number)
-        
+
         _LOGGER.debug(f"Found grill IP: {self._grill._ip} Serial: {self._grill._serial_number}")
-        
         self.update()
 
 
@@ -135,21 +134,22 @@ class GmgGrill(ClimateEntity):
         return True
 
     @property
-    def hvac_modes(self) -> List[str]:
-        """Return the supported operations."""
-        return [ HVACMode.HEAT, HVACMode.FAN_ONLY, HVACMode.OFF]
-
-    @property
     def hvac_mode(self):
         """Return current HVAC operation."""
-        if not self.available:
+        if not self.available or self._state is None:
             return HVACMode.OFF
         if self._state['on'] == 1:
             return HVACMode.HEAT
-        elif self._state['on'] == 2:
+        #It appear that a reported fan only mode when the grill is in cold smoke mode is a 3, whereas 2 is the fan only cooldown
+        elif self._state['on'] in (2, 3): # Fix: Handle both automatic cooldown (2) and cold smoke (3)
             return HVACMode.FAN_ONLY
 
         return HVACMode.OFF
+
+    @property
+    def hvac_modes(self) -> List[str]:
+        """Return the supported operations."""
+        return [HVACMode.HEAT, HVACMode.FAN_ONLY, HVACMode.OFF]
 
     @property
     def name(self)  -> None:
@@ -183,14 +183,14 @@ class GmgGrill(ClimateEntity):
     @property
     def target_temperature(self) -> None:
         """Return what the temp is set to go to"""
-        if not self.available:
+        # Fix: Safely verify the state payload exists instead of using dynamic available checks
+        if self._state is None:
             return None
+            
         grillSetTemp = self._state.get('grill_set_temp')
         tempMultiplier = self._state.get('grill_set_temp_high')
-
         if tempMultiplier == 1:
             grillSetTemp = 256 + grillSetTemp
-
         return grillSetTemp
 
     @property
@@ -270,9 +270,9 @@ class GmgGrillProbe(ClimateEntity):
     @property
     def hvac_mode(self):
         """Return current HVAC operation."""
-        if not self.available:
+        if not self.available or self._state is None:
             return HVACMode.OFF
-        # Probe temp is 89 when it is not plugged in... need to find out if better way to find if connected or not..
+        # Probe temp is 89 when it is not plugged in...
         if self._state['on'] == 1 and self._state[f'probe{self._probe_count}_temp'] != 89:
             return HVACMode.HEAT
 
@@ -306,13 +306,14 @@ class GmgGrillProbe(ClimateEntity):
 
     @property
     def target_temperature_step(self) -> None:
-        """Return the supported step of target temp"""
+        """Return the supported step of target temp"""        
         return 1
-
+        
     @property
     def target_temperature(self) -> None:
         """Return what the temp is set to go to"""
-        if not self.available:
+        # Fix: Protect against empty boot or disconnect states
+        if self._state is None:
             return None
         return self._state.get(f'probe{self._probe_count}_set_temp')
 
@@ -336,3 +337,4 @@ class GmgGrillProbe(ClimateEntity):
         self._state = self._grill.status()
 
         _LOGGER.debug(f"State: {self._state}")
+
