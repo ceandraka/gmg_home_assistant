@@ -139,10 +139,10 @@ class grill(object):
         # accept list of values from status
         if value_list is None:
             return None
-            
+
         _LOGGER.debug(f"Status response raw: {value_list}")
-        
-        # Verify the list length before parsing to avoid IndexError
+
+        # Symmetrical protection check to prevent IndexError crashes
         if len(value_list) < 34:
             _LOGGER.debug(f"Received truncated status packet (length {len(value_list)}). Expected at least 34 items.")
             return None
@@ -177,7 +177,7 @@ class grill(object):
             _LOGGER.debug(f"Status response parsed successfully: {self.state}")
             return self.state
             
-        except Exception as e:
+        except Exception:
             _LOGGER.debug("Error parsing status packet", exc_info=True)
             return None
 
@@ -252,14 +252,25 @@ class grill(object):
 
         return self._serial_number
 
-    def send(self, message, timeout = 1):
+    def send(self, message, timeout = 1):  
         """Function to send messages via UDP to grill"""
+
         data = None
-        sock = None
+        sock = None # Fix: Pre-declare to prevent UnboundLocalError if creation fails
+        
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            ...
+            sock.settimeout(timeout)
+
+            sock.sendto(message, (self._ip, grill.UDP_PORT))
+            data, _ = sock.recvfrom(1024)
+        
+        except socket.timeout:
+            _LOGGER.debug(f"Socket timed out sending message: {message}")
+        except Exception as e: 
+            _LOGGER.error(e)
         finally:
-            if sock is not None:
-                sock.close()
+            # Always close the socket
+            sock.close()
+           
         return data
